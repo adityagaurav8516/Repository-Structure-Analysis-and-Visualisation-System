@@ -85,17 +85,22 @@ def build_stats(nodes: list, edges: list) -> dict:
         elif node["type"] == "folder":
             folder_count += 1
     dependecy_edges = 0
+    contains_edges = 0
     for edge in edges:
         if edge["type"] == "depends_on":
             dependecy_edges += 1
+        elif edge["type"] == "contains":
+            contains_edges += 1
+            
     return {
         "files": file_count,
         "folders": folder_count,
         "edges": len(edges),
+        "contains_edges": contains_edges,
+        "dependency_edges": dependecy_edges,
         "total_loc": total_loc,
         "total_sloc": total_sloc,
         "languages": languages,
-        "dependency_edges": dependecy_edges,
     }
 
 
@@ -126,22 +131,23 @@ def extract_python_imports(path: Path) -> list[dict]:
                         "level": node.level,
                     }
                 )
+                for alias in node.names:
+                    imports.append(
+                        {
+                            "module": f"{node.module}.{alias.name}",
+                            "level": node.level,
+                        }
+                    )
+            else:
+                for alias in node.names:
+                    imports.append(
+                        {
+                            "module": alias.name,
+                            "level": node.level,
+                        }
+                    )
 
     return imports
-    # for line in text.splitlines():
-    #     line = line.strip()
-    #     if line.startswith("import "):
-    #         module = line.replace("import ","").split()[0]
-    #         imports.append(module)
-
-    #     elif line.startswith("from "):
-    #         parts = line.split()
-    #         if len(parts) >=2:
-    #             module = parts[1]
-    #             imports.append(module)
-
-    # return imports
-
 
 def resolve_module_to_file_id(
     import_info: dict, source_path: Path, root: Path
@@ -280,4 +286,8 @@ if __name__ == "__main__":
     print("nodes:", len(graph["nodes"]))
     print("edges:", len(graph["edges"]))
     print("dependency edges:", graph["stats"]["dependency_edges"])
-    # print(extract_python_imports(Path("scanner.py")))
+
+    print("\ndependency edges:")
+    for edge in graph["edges"]:
+        if edge["type"] == "depends_on":
+            print(edge)
