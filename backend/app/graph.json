@@ -1,0 +1,217 @@
+{
+  "nodes": [
+    {
+      "id": ".",
+      "name": "test_repo",
+      "type": "folder",
+      "parent": null
+    },
+    {
+      "id": "cpp",
+      "name": "cpp",
+      "type": "folder",
+      "parent": "."
+    },
+    {
+      "id": "frontend",
+      "name": "frontend",
+      "type": "folder",
+      "parent": "."
+    },
+    {
+      "id": "main.py",
+      "name": "main.py",
+      "type": "file",
+      "parent": ".",
+      "extension": ".py",
+      "size_bytes": 12,
+      "language": "Python",
+      "loc": 1,
+      "sloc": 1
+    },
+    {
+      "id": "utils.py",
+      "name": "utils.py",
+      "type": "file",
+      "parent": ".",
+      "extension": ".py",
+      "size_bytes": 32,
+      "language": "Python",
+      "loc": 2,
+      "sloc": 2
+    },
+    {
+      "id": "cpp/helper.hpp",
+      "name": "helper.hpp",
+      "type": "file",
+      "parent": "cpp",
+      "extension": ".hpp",
+      "size_bytes": 30,
+      "language": "C++ Header",
+      "loc": 3,
+      "sloc": 2
+    },
+    {
+      "id": "cpp/main.cpp",
+      "name": "main.cpp",
+      "type": "file",
+      "parent": "cpp",
+      "extension": ".cpp",
+      "size_bytes": 74,
+      "language": "C++",
+      "loc": 6,
+      "sloc": 5
+    },
+    {
+      "id": "frontend/app.tsx",
+      "name": "app.tsx",
+      "type": "file",
+      "parent": "frontend",
+      "extension": ".tsx",
+      "size_bytes": 157,
+      "language": "TypeScript TSX",
+      "loc": 7,
+      "sloc": 6
+    },
+    {
+      "id": "frontend/button.tsx",
+      "name": "button.tsx",
+      "type": "file",
+      "parent": "frontend",
+      "extension": ".tsx",
+      "size_bytes": 73,
+      "language": "TypeScript TSX",
+      "loc": 3,
+      "sloc": 3
+    },
+    {
+      "id": "frontend/config.json",
+      "name": "config.json",
+      "type": "file",
+      "parent": "frontend",
+      "extension": ".json",
+      "size_bytes": 22,
+      "language": "JSON",
+      "loc": 3,
+      "sloc": 3
+    },
+    {
+      "id": "frontend/style.css",
+      "name": "style.css",
+      "type": "file",
+      "parent": "frontend",
+      "extension": ".css",
+      "size_bytes": 28,
+      "language": "CSS",
+      "loc": 3,
+      "sloc": 3
+    }
+  ],
+  "edges": [
+    {
+      "source": ".",
+      "target": "cpp",
+      "type": "contains"
+    },
+    {
+      "source": ".",
+      "target": "frontend",
+      "type": "contains"
+    },
+    {
+      "id": "contains:.->main.py",
+      "source": ".",
+      "target": "main.py",
+      "type": "contains"
+    },
+    {
+      "id": "contains:.->utils.py",
+      "source": ".",
+      "target": "utils.py",
+      "type": "contains"
+    },
+    {
+      "id": "contains:cpp->cpp/helper.hpp",
+      "source": "cpp",
+      "target": "cpp/helper.hpp",
+      "type": "contains"
+    },
+    {
+      "id": "contains:cpp->cpp/main.cpp",
+      "source": "cpp",
+      "target": "cpp/main.cpp",
+      "type": "contains"
+    },
+    {
+      "id": "contains:frontend->frontend/app.tsx",
+      "source": "frontend",
+      "target": "frontend/app.tsx",
+      "type": "contains"
+    },
+    {
+      "id": "contains:frontend->frontend/button.tsx",
+      "source": "frontend",
+      "target": "frontend/button.tsx",
+      "type": "contains"
+    },
+    {
+      "id": "contains:frontend->frontend/config.json",
+      "source": "frontend",
+      "target": "frontend/config.json",
+      "type": "contains"
+    },
+    {
+      "id": "contains:frontend->frontend/style.css",
+      "source": "frontend",
+      "target": "frontend/style.css",
+      "type": "contains"
+    },
+    {
+      "id": "depends:main.py->utils.py",
+      "source": "main.py",
+      "target": "utils.py",
+      "type": "depends_on"
+    },
+    {
+      "id": "depends:cpp/main.cpp->cpp/helper.hpp",
+      "source": "cpp/main.cpp",
+      "target": "cpp/helper.hpp",
+      "type": "depends_on"
+    },
+    {
+      "id": "depends:frontend/app.tsx->frontend/button.tsx",
+      "source": "frontend/app.tsx",
+      "target": "frontend/button.tsx",
+      "type": "depends_on"
+    },
+    {
+      "id": "depends:frontend/app.tsx->frontend/style.css",
+      "source": "frontend/app.tsx",
+      "target": "frontend/style.css",
+      "type": "depends_on"
+    },
+    {
+      "id": "depends:frontend/app.tsx->frontend/config.json",
+      "source": "frontend/app.tsx",
+      "target": "frontend/config.json",
+      "type": "depends_on"
+    }
+  ],
+  "stats": {
+    "files": 8,
+    "folders": 3,
+    "edges": 15,
+    "contains_edges": 10,
+    "dependency_edges": 5,
+    "total_loc": 28,
+    "total_sloc": 25,
+    "languages": {
+      "Python": 2,
+      "C++ Header": 1,
+      "C++": 1,
+      "TypeScript TSX": 2,
+      "JSON": 1,
+      "CSS": 1
+    }
+  }
+}
