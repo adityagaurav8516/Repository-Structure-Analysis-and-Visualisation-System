@@ -1,0 +1,81 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  background: #f8fafc;
+}
+
+.app {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+}
+
+.sidebar {
+  width: 280px;
+  padding: 20px;
+  border-right: 1px solid #e5e7eb;
+  background: #ffffff;
+}
+
+.sidebar h1 {
+  font-size: 22px;
+  margin-bottom: 20px;
+}
+
+.sidebar input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.sidebar button {
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  background: #111827;
+  color: white;
+  cursor: pointer;
+}
+
+.sidebar button:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+.canvas {
+  flex: 1;
+  height: 100vh;
+}
+
+.repo-node {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.repo-node strong {
+  font-size: 14px;
+}
+
+.repo-node span {
+  color: #475569;
+}
+
+.error {
+  color: #dc2626;
+  font-size: 14px;
+  margin-top: 12px;
+}
+
+.stats {
+  margin-top: 20px;
+  font-size: 14px;
+}
