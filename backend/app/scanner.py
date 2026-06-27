@@ -1,7 +1,5 @@
 import os
 from pathlib import Path
-import os
-from pathlib import Path
 
 from app.graph_builder import (
     SKIP_DIRS,
@@ -92,7 +90,7 @@ def scan_repo(root_path: str):
             else:
                 loc, sloc = None, None
 
-            if extension == PYTHON_EXTENSIONS:
+            if extension in PYTHON_EXTENSIONS:
                 python_files.append(file_path)
             if extension in CPP_EXTENSIONS:
                 cpp_files.append(file_path)
