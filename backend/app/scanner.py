@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 
 from app.graph_builder import (
@@ -11,6 +14,7 @@ from app.graph_builder import (
     make_id,
     make_parent_id,
     count_lines,
+    estimate_complexity,
     add_dependency_edge,
     build_stats,
 )
@@ -30,7 +34,7 @@ from app.parsers.js_parser import (
     resolve_js_ts_import_to_file_id,
 )
 
-def scan_repo(root_path: str):
+def scan_repo(root_path: str) -> dict:
     root = Path(root_path).resolve()
 
     nodes = []
@@ -44,8 +48,8 @@ def scan_repo(root_path: str):
 
     root_node = {
         "id": ".",
-        "name": root.name, 
-        "type": "folder", 
+        "name": root.name,
+        "type": "folder",
         "parent": None,
     }
     nodes.append(root_node)
@@ -60,7 +64,7 @@ def scan_repo(root_path: str):
         )
         file_names = sorted(file_names)
         current = Path(current_dir)
-        
+
         for dirname in dir_names:
             folder_path = current / dirname
 
@@ -78,6 +82,7 @@ def scan_repo(root_path: str):
                     "source": folder_node["parent"],
                     "target": folder_node["id"],
                     "type": "contains",
+                    "label": "contains",
                 }
             )
 
@@ -87,14 +92,15 @@ def scan_repo(root_path: str):
 
             if extension in TEXT_EXTENSIONS:
                 loc, sloc = count_lines(file_path)
+                complexity = estimate_complexity(file_path, extension)
             else:
-                loc, sloc = None, None
+                loc, sloc, complexity = None, None, None
 
             if extension in PYTHON_EXTENSIONS:
                 python_files.append(file_path)
-            if extension in CPP_EXTENSIONS:
+            elif extension in CPP_EXTENSIONS:
                 cpp_files.append(file_path)
-            if extension in JS_TS_EXTENSIONS:
+            elif extension in JS_TS_EXTENSIONS:
                 js_ts_files.append(file_path)
 
             file_node = {
@@ -107,6 +113,12 @@ def scan_repo(root_path: str):
                 "language": LANGUAGE_BY_EXTENSION.get(extension, "Unknown"),
                 "loc": loc,
                 "sloc": sloc,
+                "complexity": complexity,
+                "metrics": {
+                    "loc": loc,
+                    "sloc": sloc,
+                    "complexity": complexity,
+                },
             }
             nodes.append(file_node)
             edge = {
@@ -114,6 +126,7 @@ def scan_repo(root_path: str):
                 "source": file_node["parent"],
                 "target": file_node["id"],
                 "type": "contains",
+                "label": "contains",
             }
             edges.append(edge)
 
@@ -127,17 +140,16 @@ def scan_repo(root_path: str):
         all_file_ids.add(file_id)
     
     for path in cpp_files:
-        all_file_ids.add(make_id(path,root))
-    
+        all_file_ids.add(make_id(path, root))
+
     for path in js_ts_files:
-        all_file_ids.add(make_id(path,root))
+        all_file_ids.add(make_id(path, root))
 
     for node in nodes:
         if node["type"] == "file":
             all_file_ids.add(node["id"])
 
-    seen_dependency_edges = set()
-
+    seen_dependency_edges: set[tuple[str, str]] = set()
 
     # python dependencies
     for source_path in python_files:
@@ -150,31 +162,31 @@ def scan_repo(root_path: str):
 
             if target_id is None:
                 continue
-            
+
             if target_id in python_file_ids:
-                 add_dependency_edge(
+                add_dependency_edge(
                     edges,
                     seen_dependency_edges,
                     source_id,
                     target_id,
-                    )
+                )
 
     # c/cpp dependencies
     for source_path in cpp_files:
         source_id = make_id(source_path, root)
-    
+
         includes = extract_cpp_includes(source_path)
-    
+
         for include_info in includes:
             target_id = resolve_cpp_include_to_file_id(
                 include_info,
                 source_path,
                 root,
             )
-    
+
             if target_id is None:
                 continue
-    
+
             if target_id in all_file_ids:
                 add_dependency_edge(
                     edges,
@@ -185,19 +197,19 @@ def scan_repo(root_path: str):
     # js/ts dependencies
     for source_path in js_ts_files:
         source_id = make_id(source_path, root)
-    
+
         imports = extract_js_ts_imports(source_path)
-    
+
         for import_path in imports:
             target_id = resolve_js_ts_import_to_file_id(
                 import_path,
                 source_path,
                 root,
             )
-    
+
             if target_id is None:
                 continue
-    
+
             if target_id in all_file_ids:
                 add_dependency_edge(
                     edges,
@@ -205,8 +217,34 @@ def scan_repo(root_path: str):
                     source_id,
                     target_id,
                 )
-    
+
+    annotate_dependency_counts(nodes, edges)
 
     stats = build_stats(nodes, edges)
 
-    return {"root": str(root),"nodes": nodes, "edges": edges, "stats": stats}
+    return {
+        "root": str(root),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "nodes": nodes,
+        "edges": edges,
+        "stats": stats,
+    }
+
+
+def annotate_dependency_counts(nodes: list[dict], edges: list[dict]) -> None:
+    incoming: dict[str, int] = {}
+    outgoing: dict[str, int] = {}
+
+    for edge in edges:
+        if edge["type"] != "depends_on":
+            continue
+
+        outgoing[edge["source"]] = outgoing.get(edge["source"], 0) + 1
+        incoming[edge["target"]] = incoming.get(edge["target"], 0) + 1
+
+    for node in nodes:
+        if node["type"] != "file":
+            continue
+
+        node["dependency_count"] = outgoing.get(node["id"], 0)
+        node["dependent_count"] = incoming.get(node["id"], 0)
