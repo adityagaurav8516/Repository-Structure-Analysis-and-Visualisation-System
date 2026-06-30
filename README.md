@@ -1,4 +1,4 @@
-# Repository Structure Analysis and Visualisation System
+# REPO ATLAS - Repository Structure Analysis and Visualisation System
 
 An interactive developer tool for scanning a local repository, extracting folder/file relationships, detecting internal imports, displaying code metrics, and summarizing individual files with AI.
 
