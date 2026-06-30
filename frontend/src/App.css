@@ -260,6 +260,15 @@ button:disabled {
   padding: 5px 9px;
 }
 
+.canvas-warning {
+  border-bottom: 1px solid #f3d19d;
+  background: #fff7ed;
+  color: #7a3a04;
+  padding: 9px 18px;
+  font-size: 13px;
+  font-weight: 650;
+}
+
 .flow-canvas {
   min-height: 0;
 }

@@ -21,4 +21,6 @@ frontend/dist-ssr/
 # Logs and local files
 *.log
 *.local
+*.zip
+.env
 .DS_Store

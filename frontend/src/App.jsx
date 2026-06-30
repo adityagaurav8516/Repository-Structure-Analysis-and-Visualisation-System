@@ -73,6 +73,8 @@ function App() {
     () => graph.nodes.find((node) => node.id === selectedNodeId) || null,
     [graph.nodes, selectedNodeId]
   );
+  const hasGraph = graph.nodes.length > 0;
+  const isLargeGraph = graph.nodes.length >= 2000;
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -190,8 +192,6 @@ function App() {
     }));
   }
 
-  const hasGraph = graph.nodes.length > 0;
-
   return (
     <div className="workspace">
       <aside className="control-panel" aria-label="Repository controls">
@@ -237,7 +237,7 @@ function App() {
             <Stat label="Folders" value={graph.stats.folders} />
             <Stat label="Imports" value={graph.stats.dependency_edges} />
             <Stat label="LoC" value={graph.stats.total_loc} />
-            <Stat label="Avg complexity" value={graph.stats.average_complexity} />
+            <Stat label="Avg estimated complexity" value={graph.stats.average_complexity} />
             <Stat label="Edges" value={graph.stats.edges} />
           </div>
         </section>
@@ -294,6 +294,12 @@ function App() {
             <span>{formatNumber(flowEdges.length)} visible edges</span>
           </div>
         </div>
+        {isLargeGraph && (
+          <div className="canvas-warning">
+            Large graph detected. Filtering by folder, file, or language will keep the
+            canvas more responsive.
+          </div>
+        )}
 
         <div className="flow-canvas">
           <ReactFlow
@@ -380,7 +386,7 @@ function Inspector({ node, summaryState, onRefresh }) {
         <Detail label="Language" value={node.language || "Folder"} />
         <Detail label="Size" value={formatBytes(node.size_bytes)} />
         <Detail label="LoC" value={formatNumber(node.loc)} />
-        <Detail label="Complexity" value={formatNumber(node.complexity)} />
+        <Detail label="Estimated complexity" value={formatNumber(node.complexity)} />
         <Detail label="Imports out" value={formatNumber(node.dependency_count)} />
         <Detail label="Imports in" value={formatNumber(node.dependent_count)} />
       </dl>

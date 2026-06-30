@@ -25,7 +25,9 @@ class SummaryCache:
         provider: str,
         prompt_version: str,
     ) -> dict[str, Any] | None:
-        cache = self._read()
+        with self._lock:
+            cache = self._read()
+
         record = cache.get(self._key(root, file_id, provider, prompt_version))
 
         if not record:
