@@ -1,7 +1,7 @@
 import { MarkerType } from "@xyflow/react";
 
-const DEPTH_SPACING = 300;
-const ROW_SPACING = 112;
+const DEPTH_SPACING = 320;
+const ROW_SPACING = 120;
 
 export function filterGraph(graph, searchTerm) {
   const query = searchTerm.trim().toLowerCase();
@@ -73,16 +73,16 @@ export function createFlowEdges(rawEdges, edgeVisibility) {
         id: edge.id || `edge-${index}`,
         source: edge.source,
         target: edge.target,
-        type: "smoothstep",
+        type: "default",
         label: isDependency ? edge.label || "imports" : "",
         animated: isDependency,
         className: isDependency ? "flow-edge dependency-edge" : "flow-edge contains-edge",
         markerEnd: isDependency
           ? {
               type: MarkerType.ArrowClosed,
-              width: 16,
-              height: 16,
-              color: "#b45309",
+              width: 14,
+              height: 14,
+              color: "#e0973d",
             }
           : undefined,
       };

@@ -58,30 +58,53 @@ def resolve_python_import_to_file_id(
     module = import_info["module"]
     level = import_info["level"]
 
-    # Decide base directory
     if level == 0:
-        base_dir = root
+        base_dirs = get_absolute_import_base_dirs(source_path, root)
     else:
         base_dir = source_path.parent
 
         for _ in range(level - 1):
             base_dir = base_dir.parent
+        base_dirs = [base_dir]
 
     module_path = module.replace(".", "/")
 
-    candidates = [
-        base_dir / f"{module_path}.py",
-        base_dir / module_path / "__init__.py",
-    ]
+    for base_dir in base_dirs:
+        candidates = [
+            base_dir / f"{module_path}.py",
+            base_dir / module_path / "__init__.py",
+        ]
 
-    for candidate in candidates:
-        try:
-            candidate = candidate.resolve()
+        for candidate in candidates:
+            try:
+                candidate = candidate.resolve()
+                candidate.relative_to(root.resolve())
 
-            if candidate.exists() and candidate.is_file():
-                return make_id(candidate, root)
+                if candidate.exists() and candidate.is_file():
+                    return make_id(candidate, root)
 
-        except ValueError:
-            continue
+            except ValueError:
+                continue
 
     return None
+
+
+def get_absolute_import_base_dirs(source_path: Path, root: Path) -> list[Path]:
+    base_dirs = []
+    current = source_path.parent.resolve()
+    root = root.resolve()
+
+    while True:
+        try:
+            current.relative_to(root)
+        except ValueError:
+            break
+
+        base_dirs.append(current)
+
+        if current == root:
+            break
+
+        current = current.parent
+
+    return base_dirs

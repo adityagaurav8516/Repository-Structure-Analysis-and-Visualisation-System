@@ -52,6 +52,34 @@ def test_scan_repo_detects_internal_dependencies_and_metrics(tmp_path: Path) -> 
     assert graph["stats"]["total_loc"] > 0
 
 
+def test_scan_repo_resolves_backend_package_imports(tmp_path: Path) -> None:
+    repo = tmp_path / "sample"
+    write_file(repo / "backend" / "app" / "__init__.py", "")
+    write_file(repo / "backend" / "app" / "graph_builder.py", "def build():\n    return {}\n")
+    write_file(
+        repo / "backend" / "app" / "scanner.py",
+        "from app.graph_builder import build\n\nresult = build()\n",
+    )
+    write_file(
+        repo / "backend" / "main.py",
+        "from app.scanner import result\n\nprint(result)\n",
+    )
+
+    graph = scan_repo(str(repo))
+    dependency_edges = {
+        (edge["source"], edge["target"])
+        for edge in graph["edges"]
+        if edge["type"] == "depends_on"
+    }
+
+    assert ("backend/main.py", "backend/app/scanner.py") in dependency_edges
+    assert (
+        "backend/app/scanner.py",
+        "backend/app/graph_builder.py",
+    ) in dependency_edges
+    assert graph["stats"]["dependency_edges"] == 2
+
+
 def test_scan_repo_skips_generated_and_dependency_directories(tmp_path: Path) -> None:
     repo = tmp_path / "sample"
     write_file(repo / "app.py", "print('ok')\n")

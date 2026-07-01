@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Background,
+  ControlButton,
   Controls,
   Handle,
   MiniMap,
   Position,
   ReactFlow,
+  SelectionMode,
   useEdgesState,
   useNodesState,
 } from "@xyflow/react";
@@ -45,21 +47,30 @@ function App() {
   const [repoPath, setRepoPath] = useState("");
   const [provider, setProvider] = useState("auto");
   const [searchTerm, setSearchTerm] = useState("");
+  const [canvasMode, setCanvasMode] = useState("pan");
+  const [moveChildrenWithParent, setMoveChildrenWithParent] = useState(false);
   const [edgeVisibility, setEdgeVisibility] = useState({
     contains: true,
     dependencies: true,
   });
   const [graph, setGraph] = useState(EMPTY_GRAPH);
   const [selectedNodeId, setSelectedNodeId] = useState("");
+  const [selectedFlowNodeIds, setSelectedFlowNodeIds] = useState([]);
   const [summaryState, setSummaryState] = useState(EMPTY_SUMMARY);
   const [scanState, setScanState] = useState({
     loading: false,
     error: "",
   });
+  const subtreeDragRef = useRef(null);
+  const flowInstanceRef = useRef(null);
 
   const filteredGraph = useMemo(
     () => filterGraph(graph, searchTerm),
     [graph, searchTerm]
+  );
+  const childrenByParentId = useMemo(
+    () => createChildrenByParentId(filteredGraph.nodes),
+    [filteredGraph.nodes]
   );
   const flowNodes = useMemo(
     () => createFlowNodes(filteredGraph.nodes),
@@ -75,14 +86,23 @@ function App() {
   );
   const hasGraph = graph.nodes.length > 0;
   const isLargeGraph = graph.nodes.length >= 2000;
+  const isSelectionMode = canvasMode === "select";
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
 
   useEffect(() => {
     setNodes(flowNodes);
+  }, [flowNodes, setNodes]);
+
+  useEffect(() => {
     setEdges(flowEdges);
-  }, [flowNodes, flowEdges, setNodes, setEdges]);
+  }, [flowEdges, setEdges]);
+
+  const clearInspector = useCallback(() => {
+    setSelectedNodeId("");
+    setSummaryState(EMPTY_SUMMARY);
+  }, []);
 
   const requestSummary = useCallback(
     async (node) => {
@@ -148,8 +168,8 @@ function App() {
       loading: true,
       error: "",
     });
-    setSelectedNodeId("");
-    setSummaryState(EMPTY_SUMMARY);
+    clearInspector();
+    setSelectedFlowNodeIds([]);
 
     try {
       const data = await scanRepository(nextRepoPath);
@@ -176,14 +196,147 @@ function App() {
   }
 
   const handleNodeClick = useCallback(
-    (_, flowNode) => {
+    (event, flowNode) => {
+      if (event.ctrlKey || event.metaKey || event.shiftKey) {
+        clearInspector();
+        return;
+      }
+
       const rawNode = flowNode.data.node;
 
       setSelectedNodeId(rawNode.id);
       requestSummary(rawNode);
     },
-    [requestSummary]
+    [clearInspector, requestSummary]
   );
+
+  const handleSelectionChange = useCallback(
+    ({ nodes: selectedNodes }) => {
+      const selectedIds = selectedNodes.map((node) => node.id);
+
+      setSelectedFlowNodeIds(selectedIds);
+
+      if (
+        selectedNodeId &&
+        (selectedIds.length !== 1 || selectedIds[0] !== selectedNodeId)
+      ) {
+        clearInspector();
+      }
+    },
+    [clearInspector, selectedNodeId]
+  );
+
+  const handleWorkspacePointerDown = useCallback(
+    (event) => {
+      if (
+        event.target.closest(".react-flow__node") ||
+        event.target.closest(".inspector")
+      ) {
+        return;
+      }
+
+      clearInspector();
+    },
+    [clearInspector]
+  );
+
+  const handleNodeDragStart = useCallback(
+    (_, flowNode) => {
+      if (!moveChildrenWithParent) {
+        subtreeDragRef.current = null;
+        return;
+      }
+
+      const descendantIds = getDescendantIds(flowNode.id, childrenByParentId);
+
+      if (descendantIds.size === 0) {
+        subtreeDragRef.current = null;
+        return;
+      }
+
+      const descendantPositions = new Map();
+
+      for (const node of nodes) {
+        if (descendantIds.has(node.id)) {
+          descendantPositions.set(node.id, { ...node.position });
+        }
+      }
+
+      if (descendantPositions.size === 0) {
+        subtreeDragRef.current = null;
+        return;
+      }
+
+      subtreeDragRef.current = {
+        nodeId: flowNode.id,
+        origin: { ...flowNode.position },
+        descendantPositions,
+      };
+    },
+    [childrenByParentId, moveChildrenWithParent, nodes]
+  );
+
+  const handleNodeDrag = useCallback(
+    (_, flowNode) => {
+      const dragState = subtreeDragRef.current;
+
+      if (!dragState || dragState.nodeId !== flowNode.id) {
+        return;
+      }
+
+      const dx = flowNode.position.x - dragState.origin.x;
+      const dy = flowNode.position.y - dragState.origin.y;
+
+      if (dx === 0 && dy === 0) {
+        return;
+      }
+
+      setNodes((currentNodes) =>
+        currentNodes.map((node) => {
+          const startPosition = dragState.descendantPositions.get(node.id);
+
+          if (!startPosition) {
+            return node;
+          }
+
+          return {
+            ...node,
+            position: {
+              x: startPosition.x + dx,
+              y: startPosition.y + dy,
+            },
+          };
+        })
+      );
+    },
+    [setNodes]
+  );
+
+  const handleNodeDragStop = useCallback(() => {
+    subtreeDragRef.current = null;
+  }, []);
+
+  const handlePaneClick = useCallback(
+    () => {
+      clearInspector();
+    },
+    [clearInspector]
+  );
+
+  const handleResetGraph = useCallback(() => {
+    subtreeDragRef.current = null;
+    clearInspector();
+    setSelectedFlowNodeIds([]);
+    setNodes(resetFlowNodes(flowNodes));
+    setEdges(resetFlowEdges(flowEdges));
+
+    window.requestAnimationFrame(() => {
+      flowInstanceRef.current?.fitView({
+        padding: 0.12,
+        duration: 220,
+      });
+    });
+  }, [clearInspector, flowEdges, flowNodes, setEdges, setNodes]);
 
   function toggleEdgeVisibility(key) {
     setEdgeVisibility((current) => ({
@@ -193,11 +346,16 @@ function App() {
   }
 
   return (
-    <div className="workspace">
+    <div
+      className={`workspace ${selectedNode ? "has-inspector" : ""}`}
+      onPointerDown={handleWorkspacePointerDown}
+    >
       <aside className="control-panel" aria-label="Repository controls">
         <div className="brand-block">
-          <p className="eyebrow">Repository Map</p>
-          <h1>Repo Atlas</h1>
+          <div className="brand-copy">
+            <p className="eyebrow">Repository Canvas</p>
+            <h1>Repo Atlas</h1>
+          </div>
         </div>
 
         <form className="scan-form" onSubmit={handleScan}>
@@ -292,6 +450,9 @@ function App() {
           <div className="canvas-counts">
             <span>{formatNumber(filteredGraph.nodes.length)} nodes</span>
             <span>{formatNumber(flowEdges.length)} visible edges</span>
+            {selectedFlowNodeIds.length > 0 && (
+              <span>{formatNumber(selectedFlowNodeIds.length)} selected</span>
+            )}
           </div>
         </div>
         {isLargeGraph && (
@@ -303,20 +464,70 @@ function App() {
 
         <div className="flow-canvas">
           <ReactFlow
+            className={isSelectionMode ? "selection-mode" : ""}
             nodes={nodes}
             edges={edges}
             nodeTypes={nodeTypes}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onNodeClick={handleNodeClick}
+            onNodeDragStart={handleNodeDragStart}
+            onNodeDrag={handleNodeDrag}
+            onNodeDragStop={handleNodeDragStop}
+            onEdgeClick={handlePaneClick}
+            onPaneClick={handlePaneClick}
+            onSelectionChange={handleSelectionChange}
+            onInit={(instance) => {
+              flowInstanceRef.current = instance;
+            }}
+            panOnDrag={isSelectionMode ? [1, 2] : true}
+            selectionKeyCode={isSelectionMode ? null : "Shift"}
+            multiSelectionKeyCode={["Control", "Meta"]}
+            selectionMode={SelectionMode.Partial}
+            selectionOnDrag={isSelectionMode}
             fitView
             minZoom={0.12}
             proOptions={{ hideAttribution: true }}
           >
-            <Background gap={22} size={1} />
-            <Controls position="bottom-left" />
+            <Background gap={24} size={1.4} color="#302f38" />
+            <Controls position="bottom-left" showInteractive={false}>
+              <ControlButton
+                className="control-toggle"
+                title="Reset graph"
+                aria-label="Reset graph"
+                disabled={!hasGraph}
+                onClick={handleResetGraph}
+              >
+                <ResetGraphIcon />
+              </ControlButton>
+              <ControlButton
+                className={`control-toggle ${isSelectionMode ? "active" : ""}`}
+                title="Select nodes"
+                aria-label="Select nodes"
+                aria-pressed={isSelectionMode}
+                onClick={() =>
+                  setCanvasMode((mode) => (mode === "select" ? "pan" : "select"))
+                }
+              >
+                <SelectToolIcon />
+              </ControlButton>
+              <ControlButton
+                className={`control-toggle ${
+                  moveChildrenWithParent ? "active" : ""
+                }`}
+                title="Move children with parent"
+                aria-label="Move children with parent"
+                aria-pressed={moveChildrenWithParent}
+                onClick={() => setMoveChildrenWithParent((enabled) => !enabled)}
+              >
+                <SubtreeMoveIcon />
+              </ControlButton>
+            </Controls>
             <MiniMap
               nodeStrokeWidth={3}
+              nodeColor={(n) => (n.data.node.type === "file" ? "#44cf6e" : "#3fa9d6")}
+              nodeBorderRadius={4}
+              maskColor="rgba(15, 15, 18, 0.72)"
               pannable
               zoomable
               position="bottom-right"
@@ -325,11 +536,13 @@ function App() {
         </div>
       </main>
 
-      <Inspector
-        node={selectedNode}
-        summaryState={summaryState}
-        onRefresh={() => requestSummary(selectedNode)}
-      />
+      {selectedNode && (
+        <Inspector
+          node={selectedNode}
+          summaryState={summaryState}
+          onRefresh={() => requestSummary(selectedNode)}
+        />
+      )}
     </div>
   );
 }
@@ -344,6 +557,9 @@ function RepoNode({ data, selected }) {
     <div className={`repo-flow-node ${node.type} ${selected ? "selected" : ""}`}>
       <Handle type="target" position={Position.Left} />
       <div className="node-topline">
+        <span className="node-glyph" aria-hidden="true">
+          {isFile ? <FileGlyph /> : <FolderGlyph />}
+        </span>
         <span className="node-type">{isFile ? node.language || "File" : "Folder"}</span>
         {isFile && <span className="node-complexity">{complexityLabel}</span>}
       </div>
@@ -359,6 +575,78 @@ function RepoNode({ data, selected }) {
       )}
       <Handle type="source" position={Position.Right} />
     </div>
+  );
+}
+
+function FolderGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" width="12" height="12" fill="none">
+      <path
+        d="M1.5 3.5A1 1 0 0 1 2.5 2.5h3.19a1 1 0 0 1 .8.4l.82 1.1h5.19a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1h-10a1 1 0 0 1-1-1z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+function FileGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" width="12" height="12" fill="none">
+      <path
+        d="M3.5 1.5h5.09a1 1 0 0 1 .7.29l2.91 2.91a1 1 0 0 1 .3.71v8.09a1 1 0 0 1-1 1h-8a1 1 0 0 1-1-1v-11a1 1 0 0 1 1-1z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+function SelectToolIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none">
+      <path
+        d="M5 5h14v14H5z"
+        stroke="currentColor"
+        strokeDasharray="3 2"
+        strokeWidth="1.8"
+      />
+      <path d="M8 8h3v3H8zM13 13h3v3h-3z" fill="currentColor" />
+    </svg>
+  );
+}
+
+function SubtreeMoveIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none">
+      <path
+        d="M12 5v6m0 0H7m5 0h5M7 11v6m10-6v6"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+      <path d="M9 3h6v4H9zM4 17h6v4H4zM14 17h6v4h-6z" fill="currentColor" />
+    </svg>
+  );
+}
+
+function ResetGraphIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none">
+      <path
+        d="M6.5 8.5A7 7 0 1 1 5 13"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+      <path
+        d="M4 5v5h5"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
   );
 }
 
@@ -471,6 +759,58 @@ function LanguageList({ languages = {} }) {
       ))}
     </div>
   );
+}
+
+function createChildrenByParentId(rawNodes) {
+  const childrenByParentId = new Map();
+
+  for (const node of rawNodes) {
+    if (!node.parent) {
+      continue;
+    }
+
+    const children = childrenByParentId.get(node.parent) || [];
+    children.push(node.id);
+    childrenByParentId.set(node.parent, children);
+  }
+
+  return childrenByParentId;
+}
+
+function getDescendantIds(nodeId, childrenByParentId) {
+  const descendants = new Set();
+  const stack = [...(childrenByParentId.get(nodeId) || [])];
+
+  while (stack.length > 0) {
+    const currentId = stack.pop();
+
+    if (descendants.has(currentId)) {
+      continue;
+    }
+
+    descendants.add(currentId);
+    stack.push(...(childrenByParentId.get(currentId) || []));
+  }
+
+  return descendants;
+}
+
+function resetFlowNodes(flowNodes) {
+  return flowNodes.map((node) => ({
+    ...node,
+    selected: false,
+    dragging: false,
+    position: {
+      ...node.position,
+    },
+  }));
+}
+
+function resetFlowEdges(flowEdges) {
+  return flowEdges.map((edge) => ({
+    ...edge,
+    selected: false,
+  }));
 }
 
 export default App;
